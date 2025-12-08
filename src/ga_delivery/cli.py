@@ -20,6 +20,12 @@ def _generate_points(count: int, seed: int | None) -> List[Point]:
     return [(rng.uniform(0, 10), rng.uniform(0, 10)) for _ in range(count)]
 
 
+def _default_csv_path() -> Path | None:
+    """Return bundled sample CSV path if it exists."""
+    candidate = Path(__file__).resolve().parents[2] / "data" / "polska_trasa.csv"
+    return candidate if candidate.exists() else None
+
+
 def _load_points_from_csv(path: Path) -> List[Point]:
     points: List[Point] = []
     with path.open(newline="", encoding="utf-8") as f:
@@ -90,7 +96,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Uruchom tryb interaktywny (menu: losuj, ręcznie, CSV, domyślne).",
     )
-    parser.add_argument("--population", type=int, default=80, help="Rozmiar populacji.")
+    parser.add_argument(
+        "--population",
+        type=int,
+        default=None,
+        help="Rozmiar populacji (domyślnie dobierany dynamicznie do liczby punktów).",
+    )
     parser.add_argument("--elite", type=int, default=2, help="Liczba osobników elitarnych.")
     parser.add_argument(
         "--mutation",
@@ -246,7 +257,12 @@ def main() -> None:
             elif choice == "2":
                 points = _prompt_points_manual()
             elif choice == "3":
-                path_str = input("Ścieżka do pliku CSV: ").strip()
+                sample_csv = _default_csv_path()
+                if sample_csv:
+                    print(f"Nacisnij ENTER aby wczytac domyslny plik: {sample_csv}")
+                path_str = input("Sciezka do pliku CSV: ").strip()
+                if not path_str and sample_csv:
+                    path_str = str(sample_csv)
                 loaded = _try_load_csv(path_str)
                 if not loaded:
                     continue

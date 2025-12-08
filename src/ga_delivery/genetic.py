@@ -11,7 +11,7 @@ from .data import route_distance
 
 @dataclass
 class GAConfig:
-    population_size: int = 80
+    population_size: int | None = None
     elite_size: int = 2
     mutation_rate: float = 0.05
     generations: int = 400
@@ -39,6 +39,7 @@ class GeneticRouteOptimizer:
         self.num_locations = len(distance_matrix)
         self.customers = list(range(1, self.num_locations))
         self.config = config or GAConfig()
+        self.population_size = self._resolve_population_size()
         if self.config.seed is not None:
             random.seed(self.config.seed)
 
@@ -76,7 +77,7 @@ class GeneticRouteOptimizer:
         """Create the initial population using random permutations."""
         return [
             random.sample(self.customers, len(self.customers))
-            for _ in range(self.config.population_size)
+            for _ in range(self.population_size)
         ]
 
     def _fitness(self, individual: Sequence[int]) -> float:
@@ -122,10 +123,20 @@ class GeneticRouteOptimizer:
         elites = [population[i][:] for i in sorted_indices[: self.config.elite_size]]
 
         children: List[List[int]] = elites
-        while len(children) < self.config.population_size:
+        while len(children) < self.population_size:
             parent1 = self._select_parent(population, fitnesses)
             parent2 = self._select_parent(population, fitnesses)
             child = self._order_crossover(parent1, parent2)
             self._mutate(child)
             children.append(child)
         return children
+
+    def _resolve_population_size(self) -> int:
+        """Allow dynamic population sizing when user passes None or <=0."""
+        if self.config.population_size and self.config.population_size > 0:
+            return self.config.population_size
+
+        # Heuristic: scale with number of customers, cap to keep runtime sane.
+        auto_size = min(max(6 * len(self.customers), 40), 500)
+        self.config.population_size = auto_size
+        return auto_size
